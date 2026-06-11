@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RHVoice WebAssembly — Lëtzebuergesch (Mil &amp; Mia)</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+    h1 { font-size: 1.4rem; }
+    article { background: #f3f5f7; border-left: 4px solid #2a6; padding: 1rem 1.25rem; border-radius: 6px; }
+    .controls { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin: 1rem 0; }
+    button { font-size: 1rem; padding: .5rem 1rem; border: 0; border-radius: 6px; background: #2a6; color: #fff; cursor: pointer; }
+    button:disabled { background: #aaa; cursor: progress; }
+    textarea { width: 100%; min-height: 5rem; font: inherit; padding: .5rem; box-sizing: border-box; }
+    label { font-weight: 600; }
+    #status { margin-top: 1rem; padding: .6rem .8rem; background: #fff8e1; border: 1px solid #f0d98a; border-radius: 6px; font-size: .9rem; white-space: pre-wrap; }
+    progress { width: 100%; height: .5rem; }
+  </style>
+</head>
+<body>
+  <h1>RHVoice in the browser — Luxembourgish voices Mil &amp; Mia</h1>
+  <p>A proof of concept: the RHVoice synthesizer compiled to WebAssembly, reading
+     Luxembourgish text and playing it back through the Web Audio API — no server.</p>
+
+  <div class="controls">
+    <label for="voice">Voice:</label>
+    <select id="voice">
+      <option value="mia">Mia (female)</option>
+      <option value="mil">Mil (male)</option>
+    </select>
+    <button id="read-page">🔊 Read this page</button>
+  </div>
+
+  <article id="page-text">
+    <p>Moien! Wëllkomm op dëser Säit. Dëst ass eng Demonstratioun vun der
+       Lëtzebuerger Sprooch mat RHVoice, deen direkt am Browser leeft.</p>
+    <p>D'Stëmmen Mil a Mia kënnen elo Texter virliesen, ouni datt e Server néideg ass.
+       D'Sprooch gëtt mat WebAssembly synthetiséiert an iwwer d'Web&nbsp;Audio&nbsp;API ofgespillt.</p>
+  </article>
+
+  <p style="margin-top:1.5rem"><label for="free-text">Or type your own text:</label></p>
+  <textarea id="free-text">Schwätzt mat mir op Lëtzebuergesch!</textarea>
+  <div class="controls">
+    <button id="speak">▶︎ Speak the text above</button>
+  </div>
+
+  <progress id="bar" value="0" max="1" hidden></progress>
+  <div id="status">Loading…</div>
+
+  <!-- Order matters: the Emscripten factory first, then our wrapper. -->
+  <script src="dist/rhvoice.js"></script>
+  <script src="src/rhvoice-tts.js"></script>
+  <script>
+    const statusEl = document.getElementById('status');
+    const barEl = document.getElementById('bar');
+    const speakBtn = document.getElementById('speak');
+    const readBtn = document.getElementById('read-page');
+    const voiceSel = document.getElementById('voice');
+
+    const setStatus = (msg, frac) => {
+      statusEl.textContent = msg;
+      if (typeof frac === 'number') { barEl.hidden = false; barEl.value = frac; }
+      else { barEl.hidden = true; }
+    };
+
+    let booted = false;
+    async function ensureReady() {
+      if (booted) return;
+      try {
+        await RHVoiceTTS.init(setStatus);
+        booted = true;
+        setStatus('Ready — pick a voice and press a button.');
+      } catch (e) {
+        setStatus('Error: ' + e.message);
+        throw e;
+      }
+    }
+
+    async function say(text) {
+      speakBtn.disabled = readBtn.disabled = true;
+      try {
+        await ensureReady();      // first click downloads data, inits engine
+        setStatus(`Synthesizing with “${voiceSel.value}”…`);
+        await RHVoiceTTS.speak(text, voiceSel.value);
+        setStatus('Done.');
+      } catch (e) {
+        setStatus('Error: ' + e.message);
+      } finally {
+        speakBtn.disabled = readBtn.disabled = false;
+      }
+    }
+
+    speakBtn.addEventListener('click', () =>
+      say(document.getElementById('free-text').value));
+    readBtn.addEventListener('click', () =>
+      say(document.getElementById('page-text').innerText));
+
+    // Pre-warm the module (download + init) so the first click is fast. Audio
+    // playback still waits for the user gesture, satisfying autoplay rules.
+    setStatus('Loading synthesizer… (first load downloads ~6 MB; cached afterwards)');
+    ensureReady().catch(() => {});
+  </script>
+</body>
+</html>

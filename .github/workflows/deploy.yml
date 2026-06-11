@@ -1,0 +1,70 @@
+name: Build and deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Permissions the GitHub Pages deploy needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment; don't cancel an in-progress one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest          # pin (e.g. 3.1.74) for reproducible builds
+          actions-cache-folder: emsdk-cache
+
+      - name: Fetch upstream sources (RHVoice + voices + Boost/sonic)
+        run: bash vendor.sh
+
+      - name: Stage + gzip data and write manifest
+        run: bash make-data.sh
+
+      - name: Build WebAssembly
+        run: bash build.sh
+
+      - name: Assemble site
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site/dist _site/src _site/data
+          cp index.html _site/
+          cp dist/rhvoice.js dist/rhvoice.wasm _site/dist/
+          cp src/rhvoice-tts.js _site/src/
+          cp data/manifest.json _site/data/
+          # The browser only fetches the gzipped data files; ship just those.
+          rsync -a --prune-empty-dirs \
+            --include='*/' --include='*.gz' --exclude='*' \
+            data/ _site/data/
+          echo "Site contents:"; du -sh _site; find _site -maxdepth 2 -type d
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
