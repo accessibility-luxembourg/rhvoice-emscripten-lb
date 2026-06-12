@@ -90,10 +90,16 @@
       }
     }
 
-    speakBtn.addEventListener('click', () =>
-      say(document.getElementById('free-text').value));
-    readBtn.addEventListener('click', () =>
-      say(document.getElementById('page-text').innerText));
+    // Unlock audio synchronously on the tap (required by iOS Safari) BEFORE the
+    // async download/synthesis work, then speak.
+    speakBtn.addEventListener('click', () => {
+      RHVoiceTTS.unlock();
+      say(document.getElementById('free-text').value);
+    });
+    readBtn.addEventListener('click', () => {
+      RHVoiceTTS.unlock();
+      say(document.getElementById('page-text').innerText);
+    });
 
     // Pre-warm the module (download + init) so the first click is fast. Audio
     // playback still waits for the user gesture, satisfying autoplay rules.

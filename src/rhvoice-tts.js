@@ -141,18 +141,47 @@ const RHVoiceTTS = (() => {
     return { samples: count, sampleRate: sr, duration: count / sr };
   }
 
-  function play(f32, sampleRate) {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // iOS Safari only lets an AudioContext start/resume from within a user-gesture
+  // handler. Synthesis is async, so by the time we play() the gesture is gone —
+  // therefore the context MUST be created and resumed here, called synchronously
+  // from the click/tap before any await. Playing a 1-sample silent buffer is the
+  // canonical way to "unlock" audio on iOS. Safe and cheap to call on every tap.
+  function unlock() {
+    if (!audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      audioCtx = new Ctx();
+    }
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    const buffer = audioCtx.createBuffer(1, f32.length, sampleRate);
-    buffer.getChannelData(0).set(f32);
-    const node = audioCtx.createBufferSource();
-    node.buffer = buffer;
-    node.connect(audioCtx.destination);
-    return new Promise((resolve) => { node.onended = resolve; node.start(); });
+    try {
+      const b = audioCtx.createBuffer(1, 1, audioCtx.sampleRate || 22050);
+      const s = audioCtx.createBufferSource();
+      s.buffer = b;
+      s.connect(audioCtx.destination);
+      s.start(0);
+    } catch (e) { /* already unlocked */ }
+    return audioCtx;
   }
 
-  return { init, speak, isReady: () => booted && engineVoices !== '' };
+  function play(f32, sampleRate) {
+    const ctx = unlock();              // context was unlocked on the tap; reuse it
+    if (ctx.state === 'suspended') ctx.resume();
+    const buffer = ctx.createBuffer(1, f32.length, sampleRate);
+    buffer.getChannelData(0).set(f32);
+    const node = ctx.createBufferSource();
+    node.buffer = buffer;
+    node.connect(ctx.destination);
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      node.onended = finish;
+      // iOS sometimes drops 'ended'; back it up with a timer.
+      setTimeout(finish, (f32.length / sampleRate) * 1000 + 250);
+      node.start();
+    });
+  }
+
+  return { init, speak, unlock, isReady: () => booted && engineVoices !== '' };
 })();
 
 // Expose as a window global (a top-level `const` does not attach to window).
