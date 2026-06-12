@@ -147,6 +147,15 @@ const RHVoiceTTS = (() => {
   // from the click/tap before any await. Playing a 1-sample silent buffer is the
   // canonical way to "unlock" audio on iOS. Safe and cheap to call on every tap.
   function unlock() {
+    // Tell iOS this is media playback: use the media volume and ignore the
+    // silent/mute switch. Without this, iOS Safari plays Web Audio through the
+    // "ambient" session — audible to the tab (sound icon shows) but silenced by
+    // the mute switch / low ringer volume, i.e. "plays but you hear nothing".
+    try {
+      if (navigator.audioSession && navigator.audioSession.type !== 'playback')
+        navigator.audioSession.type = 'playback';
+    } catch (e) { /* not supported — ignore */ }
+
     if (!audioCtx) {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return null;
@@ -181,7 +190,15 @@ const RHVoiceTTS = (() => {
     });
   }
 
-  return { init, speak, unlock, isReady: () => booted && engineVoices !== '' };
+  function audioInfo() {
+    return {
+      audioSession: (navigator.audioSession && navigator.audioSession.type) || 'unsupported',
+      ctxState: audioCtx ? audioCtx.state : 'none',
+      sampleRate: audioCtx ? audioCtx.sampleRate : 0,
+    };
+  }
+
+  return { init, speak, unlock, audioInfo, isReady: () => booted && engineVoices !== '' };
 })();
 
 // Expose as a window global (a top-level `const` does not attach to window).

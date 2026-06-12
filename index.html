@@ -81,8 +81,10 @@
       try {
         await ensureReady();      // first click downloads data, inits engine
         setStatus(`Synthesizing with “${voiceSel.value}”…`);
-        await RHVoiceTTS.speak(text, voiceSel.value);
-        setStatus('Done.');
+        const r = await RHVoiceTTS.speak(text, voiceSel.value);
+        const a = RHVoiceTTS.audioInfo();
+        setStatus(`Done — ${r.duration.toFixed(1)}s. ` +
+          `audio: session=${a.audioSession}, ctx=${a.ctxState}, ${a.sampleRate}Hz`);
       } catch (e) {
         setStatus('Error: ' + e.message);
       } finally {
