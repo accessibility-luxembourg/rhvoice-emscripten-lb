@@ -42,7 +42,12 @@
   <textarea id="free-text">Schwätzt mat mir op Lëtzebuergesch!</textarea>
   <div class="controls">
     <button id="speak">▶︎ Speak the text above</button>
+    <label><input type="checkbox" id="ssml"> Treat as SSML</label>
   </div>
+  <p style="font-size:.85rem;color:#555;margin-top:-.25rem">
+    SSML example:
+    <code>&lt;speak&gt;Moien. &lt;break time="1s"/&gt; Äddi.&lt;/speak&gt;</code>
+  </p>
 
   <progress id="bar" value="0" max="1" hidden></progress>
   <div id="status">Loading…</div>
@@ -57,6 +62,7 @@
     const speakBtn = document.getElementById('speak');
     const readBtn = document.getElementById('read-page');
     const voiceSel = document.getElementById('voice');
+    const ssmlChk = document.getElementById('ssml');
 
     const setStatus = (msg, frac) => {
       statusEl.textContent = msg;
@@ -77,12 +83,12 @@
       }
     }
 
-    async function say(text) {
+    async function say(text, opts = {}) {
       speakBtn.disabled = readBtn.disabled = true;
       try {
         await ensureReady();      // first click downloads data, inits engine
         setStatus(`Synthesizing with “${voiceSel.value}”…`);
-        const r = await RHVoiceTTS.speak(text, voiceSel.value);
+        const r = await RHVoiceTTS.speak(text, voiceSel.value, opts);
         const a = RHVoiceTTS.audioInfo();
         setStatus(`Done — ${r.duration.toFixed(1)}s. ` +
           `audio: session=${a.audioSession}, ctx=${a.ctxState}, ${a.sampleRate}Hz`);
@@ -97,11 +103,11 @@
     // async download/synthesis work, then speak.
     speakBtn.addEventListener('click', () => {
       RHVoiceTTS.unlock();
-      say(document.getElementById('free-text').value);
+      say(document.getElementById('free-text').value, { ssml: ssmlChk.checked });
     });
     readBtn.addEventListener('click', () => {
       RHVoiceTTS.unlock();
-      say(document.getElementById('page-text').innerText);
+      say(document.getElementById('page-text').innerText);  // page text is plain
     });
 
     // Pre-warm the module (download + init) so the first click is fast. Audio

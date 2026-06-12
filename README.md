@@ -21,7 +21,8 @@ HTML page and playing it back through the **Web Audio API** — no server.
   time it's used. A first run with one voice is **~6 MB** (vs ~47 MB raw); the
   language FSTs compress from ~29 MB to ~3 MB, each voice model is ~3–4 MB.
 - `index.html` is the demo: pick Mil/Mia, then "Read this page" (reads the
-  article text) or speak your own text.
+  article text) or speak your own text — plain or **SSML** (e.g. `<break>`,
+  prosody), via the "Treat as SSML" toggle.
 
 ## Use as a library
 
@@ -36,10 +37,13 @@ await RHVoiceTTS.init();                      // boot + preload the default voic
 button.addEventListener('click', () => {
   RHVoiceTTS.unlock();                        // MUST run synchronously in the gesture (iOS)
   RHVoiceTTS.speak('Moien!', 'mil', { rate: 1, pitch: 1, volume: 1 });
+  // SSML is supported too:
+  RHVoiceTTS.speak('<speak>Moien. <break time="1s"/> Äddi.</speak>', 'mia', { ssml: true });
 });
 ```
 
-API: `init(onProgress?, defaultVoice?)`, `speak(text, voice, opts?)` (resolves
+API: `init(onProgress?, defaultVoice?)`, `speak(text, voice, opts?)` where `opts`
+is `{ rate, pitch, volume, ssml, onProgress }` (resolves
 `{samples, sampleRate, duration}`), `unlock()`, `audioInfo()`, `isReady()`. The
 module imports `../dist/rhvoice.js` and resolves `../data/` relative to itself
 (`import.meta.url`), so it works from any base path.

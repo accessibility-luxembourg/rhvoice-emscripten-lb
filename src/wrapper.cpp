@@ -90,11 +90,12 @@ int rhv_init(const char* data_path, const char* config_path) {
 }
 
 // Synthesize `text` with voice `voice_spec` (e.g. "mil"). rate/pitch/volume are
-// relative multipliers (1.0 == default). Returns the number of PCM samples
-// produced, or negative on error.
+// relative multipliers (1.0 == default). When `ssml` is non-zero, `text` is
+// parsed as SSML (e.g. <speak>…<break time="500ms"/>…</speak>) instead of plain
+// text. Returns the number of PCM samples produced, or negative on error.
 EMSCRIPTEN_KEEPALIVE
 int rhv_speak(const char* text, const char* voice_spec,
-              double rate, double pitch, double volume) {
+              double rate, double pitch, double volume, int ssml) {
   if (!g_engine) {
     g_error = "engine not initialized";
     return -1;
@@ -110,8 +111,9 @@ int rhv_speak(const char* text, const char* voice_spec,
       return -2;
     }
     std::unique_ptr<document> doc =
-        document::create_from_plain_text(g_engine, s.begin(), s.end(),
-                                         content_text, profile);
+        ssml ? document::create_from_ssml(g_engine, s.begin(), s.end(), profile)
+             : document::create_from_plain_text(g_engine, s.begin(), s.end(),
+                                                 content_text, profile);
     if (rate > 0)   doc->speech_settings.relative.rate = rate;
     if (pitch > 0)  doc->speech_settings.relative.pitch = pitch;
     if (volume > 0) doc->speech_settings.relative.volume = volume;

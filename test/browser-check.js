@@ -37,6 +37,15 @@ async function run(pass) {
     if (!results[voice] || results[voice].samples <= 0)
       throw new Error(`no audio produced for ${voice}`);
   }
+
+  // SSML through the JS path: a 1s <break> must lengthen output vs plain words.
+  const plain = await page.evaluate(() => RHVoiceTTS.speak('Moien. Äddi.', 'mia'));
+  const ssml = await page.evaluate(() =>
+    RHVoiceTTS.speak('<speak>Moien. <break time="1s"/> Äddi.</speak>', 'mia', { ssml: true }));
+  if (!(ssml.samples > plain.samples))
+    throw new Error('SSML <break> not applied in browser');
+  results.ssml = { plain: +plain.duration.toFixed(2), break: +ssml.duration.toFixed(2) };
+
   await browser.close();
   return { downloaded, cached, results };
 }

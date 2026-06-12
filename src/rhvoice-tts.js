@@ -125,13 +125,16 @@ export async function init(onProgress, defaultVoice = 'mia') {
 }
 
 // Synthesize and play. Resolves with {samples, sampleRate, duration} when done.
+// opts: { rate, pitch, volume } relative multipliers (1.0 = default),
+//        ssml (bool) — parse `text` as SSML, onProgress(msg, frac?).
 export async function speak(text, voice, opts = {}) {
   const report = (m, f) => { log(m); if (opts.onProgress) opts.onProgress(m, f); };
   await prepare(voice, report);   // fetches the voice on demand if new
-  const { rate = 1.0, pitch = 1.0, volume = 1.0 } = opts;
+  const { rate = 1.0, pitch = 1.0, volume = 1.0, ssml = false } = opts;
 
   const n = Module.ccall('rhv_speak', 'number',
-    ['string', 'string', 'number', 'number', 'number'], [text, voice, rate, pitch, volume]);
+    ['string', 'string', 'number', 'number', 'number', 'number'],
+    [text, voice, rate, pitch, volume, ssml ? 1 : 0]);
   if (n < 0) throw new Error('synthesis failed: ' + lastError());
 
   const ptr = Module.ccall('rhv_samples_ptr', 'number', [], []);

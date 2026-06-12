@@ -33,18 +33,34 @@ function writeWav(file, int16, sampleRate) {
 
   console.log('Available voices:', Module.ccall('rhv_voices', 'string', [], []));
 
-  const text = 'Moien! Dëst ass en Test vun der Lëtzebuerger Sprooch mat RHVoice.';
-  for (const voice of ['mia', 'mil']) {
+  const synth = (text, voice, ssml) => {
     const n = Module.ccall('rhv_speak', 'number',
-      ['string', 'string', 'number', 'number', 'number'], [text, voice, 1, 1, 1]);
-    if (n < 0) throw new Error(`rhv_speak(${voice}) failed: ` + Module.ccall('rhv_last_error', 'string', [], []));
+      ['string', 'string', 'number', 'number', 'number', 'number'],
+      [text, voice, 1, 1, 1, ssml ? 1 : 0]);
+    if (n < 0) throw new Error(`rhv_speak failed: ` + Module.ccall('rhv_last_error', 'string', [], []));
     const ptr = Module.ccall('rhv_samples_ptr', 'number', [], []);
     const count = Module.ccall('rhv_sample_count', 'number', [], []);
     const sr = Module.ccall('rhv_sample_rate', 'number', [], []);
-    const pcm = Module.HEAP16.slice(ptr >> 1, (ptr >> 1) + count);
+    return { pcm: Module.HEAP16.slice(ptr >> 1, (ptr >> 1) + count), count, sr };
+  };
+
+  const text = 'Moien! Dëst ass en Test vun der Lëtzebuerger Sprooch mat RHVoice.';
+  for (const voice of ['mia', 'mil']) {
+    const { pcm, count, sr } = synth(text, voice, false);
     const out = path.resolve(__dirname, `out-${voice}.wav`);
     writeWav(out, pcm, sr);
     console.log(`${voice}: ${count} samples @ ${sr} Hz -> ${out} (${(count / sr).toFixed(2)}s)`);
   }
+
+  // SSML: a 1s pause should make this clearly longer than the same words plain.
+  const words = 'Moien. Äddi.';
+  const ssml = '<speak>Moien. <break time="1s"/> Äddi.</speak>';
+  const plain = synth(words, 'mia', false);
+  const withBreak = synth(ssml, 'mia', true);
+  writeWav(path.resolve(__dirname, 'out-ssml.wav'), withBreak.pcm, withBreak.sr);
+  console.log(`ssml: plain=${(plain.count / plain.sr).toFixed(2)}s vs break=${(withBreak.count / withBreak.sr).toFixed(2)}s`);
+  if (withBreak.count <= plain.count)
+    throw new Error('SSML <break> did not lengthen output — SSML not applied');
+
   console.log('OK');
 })().catch((e) => { console.error(e); process.exit(1); });
