@@ -33,10 +33,10 @@ function writeWav(file, int16, sampleRate) {
 
   console.log('Available voices:', Module.ccall('rhv_voices', 'string', [], []));
 
-  const synth = (text, voice, ssml) => {
+  const synth = (text, voice, ssml, rate = 1) => {
     const n = Module.ccall('rhv_speak', 'number',
       ['string', 'string', 'number', 'number', 'number', 'number'],
-      [text, voice, 1, 1, 1, ssml ? 1 : 0]);
+      [text, voice, rate, 1, 1, ssml ? 1 : 0]);
     if (n < 0) throw new Error(`rhv_speak failed: ` + Module.ccall('rhv_last_error', 'string', [], []));
     const ptr = Module.ccall('rhv_samples_ptr', 'number', [], []);
     const count = Module.ccall('rhv_sample_count', 'number', [], []);
@@ -61,6 +61,13 @@ function writeWav(file, int16, sampleRate) {
   console.log(`ssml: plain=${(plain.count / plain.sr).toFixed(2)}s vs break=${(withBreak.count / withBreak.sr).toFixed(2)}s`);
   if (withBreak.count <= plain.count)
     throw new Error('SSML <break> did not lengthen output — SSML not applied');
+
+  // Rate: faster speech => fewer samples for the same text.
+  const slow = synth(text, 'mia', false, 0.7);
+  const fast = synth(text, 'mia', false, 1.6);
+  console.log(`rate: 0.7x=${(slow.count / slow.sr).toFixed(2)}s vs 1.6x=${(fast.count / fast.sr).toFixed(2)}s`);
+  if (fast.count >= slow.count)
+    throw new Error('speech rate had no effect');
 
   console.log('OK');
 })().catch((e) => { console.error(e); process.exit(1); });
