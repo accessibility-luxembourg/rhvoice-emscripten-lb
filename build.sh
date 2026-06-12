@@ -112,6 +112,7 @@ compile c "$RH/external/libs/sonic/sonic.c" "$OBJ/sonic.o" "${CFLAGS[@]}"
 echo "Linking dist/rhvoice.js ..."
 emcc $OPT -fexceptions "${OBJS[@]}" -o "$DIST/rhvoice.js" \
   -s MODULARIZE=1 \
+  -s EXPORT_ES6=1 \
   -s EXPORT_NAME=RHVoiceModule \
   -s ENVIRONMENT=web,worker,node \
   -s ALLOW_MEMORY_GROWTH=1 \

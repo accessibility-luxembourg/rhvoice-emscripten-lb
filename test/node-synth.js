@@ -3,7 +3,7 @@
 // output can be inspected. Proves the wasm pipeline works end to end.
 const path = require('path');
 const fs = require('fs');
-const RHVoiceModule = require('../dist/rhvoice.js');
+const { pathToFileURL } = require('url');
 
 function writeWav(file, int16, sampleRate) {
   const dataLen = int16.length * 2;
@@ -18,6 +18,10 @@ function writeWav(file, int16, sampleRate) {
 }
 
 (async () => {
+  // dist/rhvoice.js is now an ES module — load it via dynamic import.
+  const RHVoiceModule = (await import(
+    pathToFileURL(path.resolve(__dirname, '..', 'dist', 'rhvoice.js')).href
+  )).default;
   const Module = await RHVoiceModule();
   const dataDir = path.resolve(__dirname, '..', 'data');
 

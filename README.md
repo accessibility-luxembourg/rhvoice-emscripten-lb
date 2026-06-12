@@ -10,10 +10,11 @@ HTML page and playing it back through the **Web Audio API** — no server.
 - The C++ core is compiled with `emcc`. RHVoice's native audio backends are not
   built; instead `src/wrapper.cpp` subclasses RHVoice's `client` to capture the
   16-bit PCM the engine produces.
-- `src/rhvoice-tts.js` boots the module, fetches the language + voice data into
-  the Emscripten filesystem **on demand** and caches it in **IndexedDB** (IDBFS),
-  then converts the captured PCM to `Float32` and plays it via an
-  `AudioBufferSourceNode` at 24 kHz.
+- `src/rhvoice-tts.js` is an **ES module** that imports the Emscripten factory,
+  boots the module, fetches the language + voice data into the Emscripten
+  filesystem **on demand** and caches it in **IndexedDB** (IDBFS), then converts
+  the captured PCM to `Float32` and plays it via an `AudioBufferSourceNode` at
+  24 kHz. (`dist/rhvoice.js` is itself built as an ES module via `EXPORT_ES6`.)
 - **Download size:** data files are gzipped and inflated in the browser with the
   native `DecompressionStream` (works with any static host — no server config).
   Only what's needed is fetched: the language set once, plus each voice the first
@@ -21,6 +22,27 @@ HTML page and playing it back through the **Web Audio API** — no server.
   language FSTs compress from ~29 MB to ~3 MB, each voice model is ~3–4 MB.
 - `index.html` is the demo: pick Mil/Mia, then "Read this page" (reads the
   article text) or speak your own text.
+
+## Use as a library
+
+`src/rhvoice-tts.js` is an ES module with a small API. Serve `dist/`, `src/` and
+`data/` (the layout this repo produces), then:
+
+```js
+import * as RHVoiceTTS from './src/rhvoice-tts.js';
+
+await RHVoiceTTS.init();                      // boot + preload the default voice (mia)
+
+button.addEventListener('click', () => {
+  RHVoiceTTS.unlock();                        // MUST run synchronously in the gesture (iOS)
+  RHVoiceTTS.speak('Moien!', 'mil', { rate: 1, pitch: 1, volume: 1 });
+});
+```
+
+API: `init(onProgress?, defaultVoice?)`, `speak(text, voice, opts?)` (resolves
+`{samples, sampleRate, duration}`), `unlock()`, `audioInfo()`, `isReady()`. The
+module imports `../dist/rhvoice.js` and resolves `../data/` relative to itself
+(`import.meta.url`), so it works from any base path.
 
 ## Layout
 

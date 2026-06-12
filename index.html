@@ -47,10 +47,11 @@
   <progress id="bar" value="0" max="1" hidden></progress>
   <div id="status">Loading…</div>
 
-  <!-- Order matters: the Emscripten factory first, then our wrapper. -->
-  <script src="dist/rhvoice.js"></script>
-  <script src="src/rhvoice-tts.js"></script>
-  <script>
+  <!-- The library is an ES module; it imports the Emscripten factory itself. -->
+  <script type="module">
+    import * as RHVoiceTTS from './src/rhvoice-tts.js';
+    window.RHVoiceTTS = RHVoiceTTS;  // expose for the console / automated tests
+
     const statusEl = document.getElementById('status');
     const barEl = document.getElementById('bar');
     const speakBtn = document.getElementById('speak');
