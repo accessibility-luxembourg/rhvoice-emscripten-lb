@@ -46,6 +46,19 @@ async function run(pass) {
     throw new Error('SSML <break> not applied in browser');
   results.ssml = { plain: +plain.duration.toFixed(2), break: +ssml.duration.toFixed(2) };
 
+  // Download path: synthesize() + toWav() must yield a valid mono WAV blob.
+  const wav = await page.evaluate(async () => {
+    const r = await RHVoiceTTS.synthesize('Moien.', 'mia');
+    const blob = RHVoiceTTS.toWav(r);
+    const head = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+    const s = (a, b) => String.fromCharCode(...head.slice(a, b));
+    return { size: blob.size, type: blob.type, expected: 44 + r.samples * 2,
+             riff: s(0, 4), wave: s(8, 12) };
+  });
+  if (wav.size !== wav.expected || wav.riff !== 'RIFF' || wav.wave !== 'WAVE' || wav.type !== 'audio/wav')
+    throw new Error('toWav produced an invalid WAV: ' + JSON.stringify(wav));
+  results.wav = { size: wav.size, ok: true };
+
   await browser.close();
   return { downloaded, cached, results };
 }

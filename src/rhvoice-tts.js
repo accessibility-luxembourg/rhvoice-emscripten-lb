@@ -124,10 +124,11 @@ export async function init(onProgress, defaultVoice = 'mia') {
   report('Ready.');
 }
 
-// Synthesize and play. Resolves with {samples, sampleRate, duration} when done.
+// Synthesize to 16-bit PCM WITHOUT playing. Resolves with
+// {pcm: Int16Array, sampleRate, samples, duration}.
 // opts: { rate, pitch, volume } relative multipliers (1.0 = default),
 //        ssml (bool) — parse `text` as SSML, onProgress(msg, frac?).
-export async function speak(text, voice, opts = {}) {
+export async function synthesize(text, voice, opts = {}) {
   const report = (m, f) => { log(m); if (opts.onProgress) opts.onProgress(m, f); };
   await prepare(voice, report);   // fetches the voice on demand if new
   const { rate = 1.0, pitch = 1.0, volume = 1.0, ssml = false } = opts;
@@ -140,15 +141,37 @@ export async function speak(text, voice, opts = {}) {
   const ptr = Module.ccall('rhv_samples_ptr', 'number', [], []);
   const count = Module.ccall('rhv_sample_count', 'number', [], []);
   const sr = Module.ccall('rhv_sample_rate', 'number', [], []);
-  if (count === 0) return { samples: 0, sampleRate: sr, duration: 0 };
+  // .slice() copies out of the wasm heap so the data survives the next call.
+  const pcm = Module.HEAP16.slice(ptr >> 1, (ptr >> 1) + count);
+  return { pcm, sampleRate: sr, samples: count, duration: count / sr };
+}
 
-  // Re-grab the heap view (memory may have grown) and copy Int16 -> Float32.
-  const pcm = Module.HEAP16.subarray(ptr >> 1, (ptr >> 1) + count);
-  const f32 = new Float32Array(count);
-  for (let i = 0; i < count; i++) f32[i] = pcm[i] / 32768;
+// Synthesize and play. Resolves with {samples, sampleRate, duration} when done.
+// Same opts as synthesize().
+export async function speak(text, voice, opts = {}) {
+  const { pcm, sampleRate, samples, duration } = await synthesize(text, voice, opts);
+  if (samples === 0) return { samples: 0, sampleRate, duration: 0 };
+  const f32 = new Float32Array(samples);
+  for (let i = 0; i < samples; i++) f32[i] = pcm[i] / 32768;
+  await play(f32, sampleRate);
+  return { samples, sampleRate, duration };
+}
 
-  await play(f32, sr);
-  return { samples: count, sampleRate: sr, duration: count / sr };
+// Wrap PCM (as returned by synthesize) in a 16-bit mono WAV Blob (audio/wav),
+// ready for a download link or an <audio> src.
+export function toWav({ pcm, sampleRate }) {
+  const dataLen = pcm.length * 2;
+  const buf = new ArrayBuffer(44 + dataLen);
+  const dv = new DataView(buf);
+  const tag = (off, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)); };
+  tag(0, 'RIFF'); dv.setUint32(4, 36 + dataLen, true); tag(8, 'WAVE');
+  tag(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true);   // PCM
+  dv.setUint16(22, 1, true);                                                // mono
+  dv.setUint32(24, sampleRate, true); dv.setUint32(28, sampleRate * 2, true);
+  dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  tag(36, 'data'); dv.setUint32(40, dataLen, true);
+  for (let i = 0; i < pcm.length; i++) dv.setInt16(44 + i * 2, pcm[i], true);  // little-endian
+  return new Blob([buf], { type: 'audio/wav' });
 }
 
 // iOS Safari only lets an AudioContext start/resume from within a user-gesture
@@ -210,4 +233,4 @@ export function audioInfo() {
 
 export const isReady = () => booted && engineVoices !== '';
 
-export default { init, speak, unlock, audioInfo, isReady };
+export default { init, synthesize, speak, toWav, unlock, audioInfo, isReady };

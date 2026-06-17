@@ -40,12 +40,21 @@ button.addEventListener('click', () => {
   // SSML is supported too:
   RHVoiceTTS.speak('<speak>Moien. <break time="1s"/> Äddi.</speak>', 'mia', { ssml: true });
 });
+
+// Get audio without playing it — e.g. to offer a download:
+const res = await RHVoiceTTS.synthesize('Moien!', 'mia');   // {pcm, sampleRate, samples, duration}
+const url = URL.createObjectURL(RHVoiceTTS.toWav(res));      // 16-bit mono WAV Blob
 ```
 
-API: `init(onProgress?, defaultVoice?)`, `speak(text, voice, opts?)` where `opts`
-is `{ rate, pitch, volume, ssml, onProgress }` (resolves
-`{samples, sampleRate, duration}`), `unlock()`, `audioInfo()`, `isReady()`. The
-module imports `../dist/rhvoice.js` and resolves `../data/` relative to itself
+API:
+- `init(onProgress?, defaultVoice?)` — boot + preload a voice.
+- `synthesize(text, voice, opts?)` → `{pcm: Int16Array, sampleRate, samples, duration}` (no playback).
+- `speak(text, voice, opts?)` → `{samples, sampleRate, duration}` (synthesize + play).
+- `toWav({pcm, sampleRate})` → a 16-bit mono `audio/wav` `Blob`.
+- `unlock()` (call synchronously in a gesture, iOS), `audioInfo()`, `isReady()`.
+
+`opts` is `{ rate, pitch, volume, ssml, onProgress }`. The module imports
+`../dist/rhvoice.js` and resolves `../data/` relative to itself
 (`import.meta.url`), so it works from any base path.
 
 ## Layout
@@ -55,7 +64,7 @@ module imports `../dist/rhvoice.js` and resolves `../data/` relative to itself
 | `build.sh` | Emscripten build → `dist/rhvoice.js` + `dist/rhvoice.wasm` |
 | `make-data.sh` | Stage + gzip the data tree and write `data/manifest.json` |
 | `src/wrapper.cpp` | C ABI over the RHVoice C++ core (init / speak / read PCM) |
-| `src/rhvoice-tts.js` | Module boot, on-demand data fetch+decompress+cache, `speak()`, Web Audio |
+| `src/rhvoice-tts.js` | Module boot, on-demand data fetch+decompress+cache, `synthesize()`/`speak()`/`toWav()`, Web Audio |
 | `index.html` | Demo page |
 | `data/` | Staged language + Mil/Mia voice packs (raw + `.gz`) and `manifest.json` (language + per-voice file lists) |
 | `vendor/` | Cloned RHVoice + voice sources (git submodules of upstream) |

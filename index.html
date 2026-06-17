@@ -45,6 +45,7 @@
   <textarea id="free-text">Schwätzt mat mir op Lëtzebuergesch!</textarea>
   <div class="controls">
     <button id="speak">▶︎ Speak the text above</button>
+    <button id="download">⬇︎ Download WAV</button>
     <label><input type="checkbox" id="ssml"> Treat as SSML</label>
   </div>
   <p style="font-size:.85rem;color:#555;margin-top:-.25rem">
@@ -63,6 +64,7 @@
     const statusEl = document.getElementById('status');
     const barEl = document.getElementById('bar');
     const speakBtn = document.getElementById('speak');
+    const dlBtn = document.getElementById('download');
     const readBtn = document.getElementById('read-page');
     const voiceSel = document.getElementById('voice');
     const ssmlChk = document.getElementById('ssml');
@@ -106,12 +108,38 @@
       }
     }
 
+    async function downloadWav() {
+      const text = document.getElementById('free-text').value;
+      dlBtn.disabled = true;
+      try {
+        await ensureReady();
+        setStatus('Synthesizing for download…');
+        const res = await RHVoiceTTS.synthesize(text, voiceSel.value,
+          { ssml: ssmlChk.checked, rate: rate() });
+        if (!res.samples) { setStatus('Nothing to synthesize.'); return; }
+        const url = URL.createObjectURL(RHVoiceTTS.toWav(res));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `rhvoice-${voiceSel.value}.wav`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        setStatus(`Downloaded ${a.download} — ${res.duration.toFixed(1)}s.`);
+      } catch (e) {
+        setStatus('Error: ' + e.message);
+      } finally {
+        dlBtn.disabled = false;
+      }
+    }
+
     // Unlock audio synchronously on the tap (required by iOS Safari) BEFORE the
     // async download/synthesis work, then speak.
     speakBtn.addEventListener('click', () => {
       RHVoiceTTS.unlock();
       say(document.getElementById('free-text').value, { ssml: ssmlChk.checked, rate: rate() });
     });
+    dlBtn.addEventListener('click', downloadWav);  // download needs no audio unlock
     readBtn.addEventListener('click', () => {
       RHVoiceTTS.unlock();
       say(document.getElementById('page-text').innerText, { rate: rate() });  // page text is plain
