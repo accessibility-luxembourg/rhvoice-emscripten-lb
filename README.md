@@ -127,3 +127,7 @@ The `vendor/` clones, `build/`, `dist/` and the raw `data/` files are
 node test/node-synth.js      # writes test/out-mia.wav and test/out-mil.wav (24 kHz)
 node test/browser-check.js   # Puppeteer: synth in-browser + IndexedDB cache check
 ```
+
+## License
+
+This software is published by the [Information and press service](https://sip.gouvernement.lu/en.html) of the Luxembourg Government and licensed under the MIT license. See [LICENSE](LICENSE).
