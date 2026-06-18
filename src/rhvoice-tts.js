@@ -31,6 +31,73 @@ let booted = false;               // module up, FS mounted
 const loaded = new Set();         // resource keys present in the FS ("lang", "voice:mia"…)
 let engineVoices = '';            // which voices the live engine was built with
 
+const TARGET_RATE = 24000;        // the voices' sample rate; we run the context at it
+
+// AudioWorklet processor: a simple PCM queue. Chunks (Float32, at the context
+// rate) are posted in via the port; process() drains them sample-by-sample so
+// playback starts as soon as the first chunk arrives and continues gaplessly
+// while later chunks are still being synthesized. Posted as a Blob (no extra
+// file to deploy, no path issues). Assumes context rate === source rate.
+const WORKLET_SRC = `
+class PCMStreamProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.queue = []; this.cur = null; this.pos = 0;
+    this.ended = false; this.done = false;
+    this.port.onmessage = (e) => {
+      const d = e.data;
+      if (d.type === 'pcm') this.queue.push(d.samples);
+      else if (d.type === 'end') this.ended = true;
+    };
+  }
+  process(_inputs, outputs) {
+    const out = outputs[0][0];
+    if (!out) return true;
+    let i = 0;
+    while (i < out.length) {
+      if (!this.cur || this.pos >= this.cur.length) {
+        if (this.queue.length === 0) {
+          while (i < out.length) out[i++] = 0;            // silence on underrun/end
+          if (this.ended && !this.done) { this.done = true; this.port.postMessage('drained'); return false; }
+          return true;
+        }
+        this.cur = this.queue.shift(); this.pos = 0;
+      }
+      out[i++] = this.cur[this.pos++];
+    }
+    return true;
+  }
+}
+registerProcessor('pcm-stream', PCMStreamProcessor);
+`;
+let workletURL = null;
+let workletAdded = false;
+
+// Split text into synthesis chunks at phrase endings (. ! ? ; : … and newlines),
+// accumulating up to ~maxChars so each chunk is a sensible unit. A boundary-free
+// run longer than maxChars is split on whitespace as a last resort. Lets long
+// texts start playing after the first phrase instead of after the whole thing.
+export function chunkText(text, maxChars = 250) {
+  const parts = String(text).match(/\s*[^.!?;:\n…]+[.!?;:\n…]*/g) || [];
+  const out = [];
+  let cur = '';
+  const flush = () => { const t = cur.trim(); if (t) out.push(t); cur = ''; };
+  for (const part of parts) {
+    if (cur && (cur.length + part.length) > maxChars) flush();
+    if (part.length > maxChars) {
+      for (const w of part.split(/(\s+)/)) {
+        if (cur && (cur.length + w.length) > maxChars) flush();
+        cur += w;
+      }
+    } else {
+      cur += part;
+    }
+  }
+  flush();
+  if (out.length === 0) { const t = String(text).trim(); if (t) out.push(t); }
+  return out;
+}
+
 const log = (...a) => console.log('[RHVoiceTTS]', ...a);
 const lastError = () => Module.ccall('rhv_last_error', 'string', [], []);
 
@@ -124,37 +191,105 @@ export async function init(onProgress, defaultVoice = 'mia') {
   report('Ready.');
 }
 
-// Synthesize to 16-bit PCM WITHOUT playing. Resolves with
-// {pcm: Int16Array, sampleRate, samples, duration}.
-// opts: { rate, pitch, volume } relative multipliers (1.0 = default),
-//        ssml (bool) — parse `text` as SSML, onProgress(msg, frac?).
-export async function synthesize(text, voice, opts = {}) {
-  const report = (m, f) => { log(m); if (opts.onProgress) opts.onProgress(m, f); };
+const i16ToF32 = (pcm) => {
+  const f = new Float32Array(pcm.length);
+  for (let i = 0; i < pcm.length; i++) f[i] = pcm[i] / 32768;
+  return f;
+};
+
+// Synthesize one chunk (single wasm call). Internal — returns Int16 PCM.
+async function synthChunk(text, voice, opts, report) {
   await prepare(voice, report);   // fetches the voice on demand if new
   const { rate = 1.0, pitch = 1.0, volume = 1.0, ssml = false } = opts;
-
   const n = Module.ccall('rhv_speak', 'number',
     ['string', 'string', 'number', 'number', 'number', 'number'],
     [text, voice, rate, pitch, volume, ssml ? 1 : 0]);
   if (n < 0) throw new Error('synthesis failed: ' + lastError());
-
   const ptr = Module.ccall('rhv_samples_ptr', 'number', [], []);
   const count = Module.ccall('rhv_sample_count', 'number', [], []);
   const sr = Module.ccall('rhv_sample_rate', 'number', [], []);
   // .slice() copies out of the wasm heap so the data survives the next call.
-  const pcm = Module.HEAP16.slice(ptr >> 1, (ptr >> 1) + count);
-  return { pcm, sampleRate: sr, samples: count, duration: count / sr };
+  return { pcm: Module.HEAP16.slice(ptr >> 1, (ptr >> 1) + count), sampleRate: sr, samples: count };
 }
 
-// Synthesize and play. Resolves with {samples, sampleRate, duration} when done.
-// Same opts as synthesize().
+// Synthesize to one 16-bit PCM buffer WITHOUT playing — long text is chunked at
+// phrase endings and concatenated. Resolves {pcm: Int16Array, sampleRate,
+// samples, duration}. Used for downloads and the buffered playback fallback.
+// opts: { rate, pitch, volume } multipliers, ssml (bool), onProgress(msg, frac?).
+export async function synthesize(text, voice, opts = {}) {
+  const report = (m, f) => { log(m); if (opts.onProgress) opts.onProgress(m, f); };
+  const chunks = opts.ssml ? [text] : chunkText(text);
+  const parts = [];
+  let sampleRate = TARGET_RATE, total = 0;
+  for (const c of chunks) {
+    const r = await synthChunk(c, voice, opts, report);
+    sampleRate = r.sampleRate;
+    if (r.samples) { parts.push(r.pcm); total += r.samples; }
+    await Promise.resolve();      // yield to keep the UI responsive on long texts
+  }
+  const pcm = new Int16Array(total);
+  let off = 0;
+  for (const p of parts) { pcm.set(p, off); off += p.length; }
+  return { pcm, sampleRate, samples: total, duration: total / sampleRate };
+}
+
+// Synthesize and play. For long texts this streams: each phrase chunk is fed to
+// an AudioWorklet as soon as it's synthesized, so audio starts after the first
+// phrase and plays gaplessly while the rest is synthesized. Falls back to
+// buffered playback when AudioWorklet isn't available or the context rate can't
+// match the voice. Resolves {samples, sampleRate, duration}.
 export async function speak(text, voice, opts = {}) {
+  const ctx = unlock();           // create/resume context (must run in the gesture on iOS)
+  const canStream = ctx && ctx.audioWorklet && typeof AudioWorkletNode !== 'undefined'
+                    && ctx.sampleRate === TARGET_RATE;
+  if (canStream) return speakStream(ctx, text, voice, opts);
+
+  // Buffered fallback: synthesize everything, then play one resampled buffer.
   const { pcm, sampleRate, samples, duration } = await synthesize(text, voice, opts);
   if (samples === 0) return { samples: 0, sampleRate, duration: 0 };
-  const f32 = new Float32Array(samples);
-  for (let i = 0; i < samples; i++) f32[i] = pcm[i] / 32768;
-  await play(f32, sampleRate);
+  await play(i16ToF32(pcm), sampleRate);
   return { samples, sampleRate, duration };
+}
+
+async function ensureWorklet(ctx) {
+  if (workletAdded) return;
+  if (!workletURL)
+    workletURL = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+  await ctx.audioWorklet.addModule(workletURL);
+  workletAdded = true;
+}
+
+async function speakStream(ctx, text, voice, opts) {
+  const report = (m, f) => { log(m); if (opts.onProgress) opts.onProgress(m, f); };
+  await ensureWorklet(ctx);
+  const chunks = opts.ssml ? [text] : chunkText(text);
+
+  const node = new AudioWorkletNode(ctx, 'pcm-stream',
+    { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+  node.connect(ctx.destination);
+
+  let total = 0;
+  for (const c of chunks) {
+    const r = await synthChunk(c, voice, opts, report);
+    if (r.samples) {
+      const f32 = i16ToF32(r.pcm);
+      node.port.postMessage({ type: 'pcm', samples: f32 }, [f32.buffer]);  // transfer, no copy
+      total += r.samples;
+    }
+    await Promise.resolve();      // let the synthesized chunk start playing
+  }
+  node.port.postMessage({ type: 'end' });
+
+  // Resolve when the worklet drains; back it up with a timer (headless/no-device
+  // contexts may not pump the audio thread).
+  await new Promise((resolve) => {
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    node.port.onmessage = (e) => { if (e.data === 'drained') finish(); };
+    setTimeout(finish, (total / TARGET_RATE) * 1000 + 500);
+  });
+  node.disconnect();
+  return { samples: total, sampleRate: TARGET_RATE, duration: total / TARGET_RATE };
 }
 
 // Wrap PCM (as returned by synthesize) in a 16-bit mono WAV Blob (audio/wav),
@@ -192,7 +327,10 @@ export function unlock() {
   if (!audioCtx) {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return null;
-    audioCtx = new Ctx();
+    // Run the context at the voices' rate so streamed chunks need no resampling
+    // and buffered playback matches too. Fall back if the option isn't honored.
+    try { audioCtx = new Ctx({ sampleRate: TARGET_RATE }); }
+    catch (e) { audioCtx = new Ctx(); }
   }
   if (audioCtx.state === 'suspended') audioCtx.resume();
   try {
@@ -233,4 +371,4 @@ export function audioInfo() {
 
 export const isReady = () => booted && engineVoices !== '';
 
-export default { init, synthesize, speak, toWav, unlock, audioInfo, isReady };
+export default { init, synthesize, speak, toWav, chunkText, unlock, audioInfo, isReady };

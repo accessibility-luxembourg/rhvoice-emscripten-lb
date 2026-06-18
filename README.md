@@ -12,9 +12,14 @@ HTML page and playing it back through the **Web Audio API** — no server.
   16-bit PCM the engine produces.
 - `src/rhvoice-tts.js` is an **ES module** that imports the Emscripten factory,
   boots the module, fetches the language + voice data into the Emscripten
-  filesystem **on demand** and caches it in **IndexedDB** (IDBFS), then converts
-  the captured PCM to `Float32` and plays it via an `AudioBufferSourceNode` at
-  24 kHz. (`dist/rhvoice.js` is itself built as an ES module via `EXPORT_ES6`.)
+  filesystem **on demand** and caches it in **IndexedDB** (IDBFS), then plays the
+  captured PCM through the Web Audio API. (`dist/rhvoice.js` is itself built as an
+  ES module via `EXPORT_ES6`.)
+- **Long texts:** `speak()` splits text at phrase endings (`chunkText`) and
+  **streams** — each chunk is fed to an `AudioWorkletNode` (running at 24 kHz)
+  as soon as it's synthesized, so audio starts after the first phrase and plays
+  gaplessly while the rest is synthesized, with bounded memory. Falls back to
+  buffered `AudioBufferSource` playback when AudioWorklet isn't available.
 - **Download size:** data files are gzipped and inflated in the browser with the
   native `DecompressionStream` (works with any static host — no server config).
   Only what's needed is fetched: the language set once, plus each voice the first
@@ -51,6 +56,7 @@ API:
 - `synthesize(text, voice, opts?)` → `{pcm: Int16Array, sampleRate, samples, duration}` (no playback).
 - `speak(text, voice, opts?)` → `{samples, sampleRate, duration}` (synthesize + play).
 - `toWav({pcm, sampleRate})` → a 16-bit mono `audio/wav` `Blob`.
+- `chunkText(text, maxChars=250)` → array of phrase-bounded chunks (used internally by `speak`/`synthesize`).
 - `unlock()` (call synchronously in a gesture, iOS), `audioInfo()`, `isReady()`.
 
 `opts` is `{ rate, pitch, volume, ssml, onProgress }`. The module imports

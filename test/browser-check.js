@@ -59,6 +59,28 @@ async function run(pass) {
     throw new Error('toWav produced an invalid WAV: ' + JSON.stringify(wav));
   results.wav = { size: wav.size, ok: true };
 
+  // Chunking: short text stays one chunk (no over-fragmentation); the same text
+  // splits at phrase endings once it exceeds the budget.
+  const chunkInfo = await page.evaluate(() => {
+    const s = 'Een. Zwee. Dräi. Véier. Fënnef.';
+    return { whole: RHVoiceTTS.chunkText(s).length, split: RHVoiceTTS.chunkText(s, 10).length };
+  });
+  if (chunkInfo.whole !== 1) throw new Error(`short text should be 1 chunk (got ${chunkInfo.whole})`);
+  if (chunkInfo.split < 2) throw new Error(`chunkText did not split at phrase endings (got ${chunkInfo.split})`);
+
+  // Streaming: a long multi-phrase text (>1 chunk) plays via the AudioWorklet
+  // path. The context running at 24 kHz confirms the streaming preconditions held.
+  const stream = await page.evaluate(() => {
+    const text = 'Dëst ass e Saz fir ze testen. '.repeat(12);   // ~360 chars => several chunks
+    return RHVoiceTTS.chunkText(text).length >= 2
+      ? RHVoiceTTS.speak(text, 'mia').then((r) => ({ ...r, chunks: RHVoiceTTS.chunkText(text).length }))
+      : Promise.reject(new Error('test text did not chunk'));
+  });
+  const info = await page.evaluate(() => RHVoiceTTS.audioInfo());
+  if (!stream || stream.samples <= 0) throw new Error('streamed speak produced no audio');
+  if (info.sampleRate !== 24000) throw new Error(`context not at 24 kHz (got ${info.sampleRate}) — streaming fell back`);
+  results.stream = { chunks: stream.chunks, samples: stream.samples, ctxRate: info.sampleRate };
+
   await browser.close();
   return { downloaded, cached, results };
 }
