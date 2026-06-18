@@ -57,6 +57,7 @@ API:
 - `speak(text, voice, opts?)` → `{samples, sampleRate, duration}` (synthesize + play).
 - `toWav({pcm, sampleRate})` → a 16-bit mono `audio/wav` `Blob`.
 - `chunkText(text, maxChars=250)` → array of phrase-bounded chunks (used internally by `speak`/`synthesize`).
+- `pause()` / `resume()` / `togglePause()` — suspend/resume playback (streaming and buffered alike).
 - `unlock()` (call synchronously in a gesture, iOS), `audioInfo()`, `isReady()`.
 
 `opts` is `{ rate, pitch, volume, ssml, onProgress }`. The module imports

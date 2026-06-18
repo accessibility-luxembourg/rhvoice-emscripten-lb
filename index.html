@@ -25,13 +25,14 @@
   <div class="controls">
     <label for="voice">Voice:</label>
     <select id="voice">
-      <option value="mia">Mia (female)</option>
       <option value="mil">Mil (male)</option>
+      <option value="mia">Mia (female)</option>
     </select>
     <label for="rate">Rate:</label>
     <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
     <output id="rate-val">1.0×</output>
     <button id="read-page">🔊 Read this page</button>
+    <button id="pause">⏸ Pause</button>
   </div>
 
   <article id="page-text">
@@ -66,6 +67,8 @@
     const speakBtn = document.getElementById('speak');
     const dlBtn = document.getElementById('download');
     const readBtn = document.getElementById('read-page');
+    const pauseBtn = document.getElementById('pause');
+    const resetPause = () => { pauseBtn.textContent = '⏸ Pause'; };
     const voiceSel = document.getElementById('voice');
     const ssmlChk = document.getElementById('ssml');
     const rateEl = document.getElementById('rate');
@@ -94,6 +97,7 @@
 
     async function say(text, opts = {}) {
       speakBtn.disabled = readBtn.disabled = true;
+      resetPause();               // new playback starts unpaused
       try {
         await ensureReady();      // first click downloads data, inits engine
         setStatus(`Synthesizing with “${voiceSel.value}”…`);
@@ -105,6 +109,7 @@
         setStatus('Error: ' + e.message);
       } finally {
         speakBtn.disabled = readBtn.disabled = false;
+        resetPause();             // playback finished
       }
     }
 
@@ -140,6 +145,10 @@
       say(document.getElementById('free-text').value, { ssml: ssmlChk.checked, rate: rate() });
     });
     dlBtn.addEventListener('click', downloadWav);  // download needs no audio unlock
+    pauseBtn.addEventListener('click', () => {
+      const state = RHVoiceTTS.togglePause();      // toggles the shared AudioContext
+      pauseBtn.textContent = state === 'paused' ? '▶︎ Resume' : '⏸ Pause';
+    });
     readBtn.addEventListener('click', () => {
       RHVoiceTTS.unlock();
       say(document.getElementById('page-text').innerText, { rate: rate() });  // page text is plain

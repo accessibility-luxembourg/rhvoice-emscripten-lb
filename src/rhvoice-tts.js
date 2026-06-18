@@ -280,13 +280,21 @@ async function speakStream(ctx, text, voice, opts) {
   }
   node.port.postMessage({ type: 'end' });
 
-  // Resolve when the worklet drains; back it up with a timer (headless/no-device
-  // contexts may not pump the audio thread).
+  // Resolve when the worklet drains; back it up with a safety net for
+  // headless/no-device contexts that may not pump the audio thread. The net
+  // counts only *running* time, so pausing (suspend) won't cut playback short.
   await new Promise((resolve) => {
-    let done = false;
-    const finish = () => { if (!done) { done = true; resolve(); } };
+    let done = false, iv = 0;
+    const finish = () => { if (done) return; done = true; clearInterval(iv); resolve(); };
     node.port.onmessage = (e) => { if (e.data === 'drained') finish(); };
-    setTimeout(finish, (total / TARGET_RATE) * 1000 + 500);
+    const playMs = (total / TARGET_RATE) * 1000 + 500;
+    let ran = 0, last = performance.now();
+    iv = setInterval(() => {
+      const t = performance.now();
+      if (audioCtx.state === 'running') ran += t - last;
+      last = t;
+      if (ran >= playMs) finish();
+    }, 200);
   });
   node.disconnect();
   return { samples: total, sampleRate: TARGET_RATE, duration: total / TARGET_RATE };
@@ -361,6 +369,23 @@ function play(f32, sampleRate) {
   });
 }
 
+// Pause / resume playback. Suspending the AudioContext halts both the streaming
+// worklet and buffered playback; synthesis of already-queued chunks continues so
+// audio is ready to play the moment you resume. Resolve when the state applies.
+export function pause() {
+  return (audioCtx && audioCtx.state === 'running') ? audioCtx.suspend() : Promise.resolve();
+}
+export function resume() {
+  return (audioCtx && audioCtx.state === 'suspended') ? audioCtx.resume() : Promise.resolve();
+}
+// Flip pause<->play; returns the intended new state ('paused' | 'running' | 'none').
+export function togglePause() {
+  if (!audioCtx) return 'none';
+  if (audioCtx.state === 'running') { audioCtx.suspend(); return 'paused'; }
+  if (audioCtx.state === 'suspended') { audioCtx.resume(); return 'running'; }
+  return audioCtx.state;
+}
+
 export function audioInfo() {
   return {
     audioSession: (navigator.audioSession && navigator.audioSession.type) || 'unsupported',
@@ -371,4 +396,7 @@ export function audioInfo() {
 
 export const isReady = () => booted && engineVoices !== '';
 
-export default { init, synthesize, speak, toWav, chunkText, unlock, audioInfo, isReady };
+export default {
+  init, synthesize, speak, toWav, chunkText,
+  unlock, pause, resume, togglePause, audioInfo, isReady,
+};

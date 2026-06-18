@@ -81,6 +81,17 @@ async function run(pass) {
   if (info.sampleRate !== 24000) throw new Error(`context not at 24 kHz (got ${info.sampleRate}) — streaming fell back`);
   results.stream = { chunks: stream.chunks, samples: stream.samples, ctxRate: info.sampleRate };
 
+  // Pause/resume toggles the shared AudioContext state.
+  const pz = await page.evaluate(async () => {
+    RHVoiceTTS.unlock();
+    await RHVoiceTTS.pause();  const a = RHVoiceTTS.audioInfo().ctxState;
+    await RHVoiceTTS.resume(); const b = RHVoiceTTS.audioInfo().ctxState;
+    return { paused: a, resumed: b };
+  });
+  if (pz.paused !== 'suspended' || pz.resumed !== 'running')
+    throw new Error('pause/resume did not change context state: ' + JSON.stringify(pz));
+  results.pause = pz;
+
   await browser.close();
   return { downloaded, cached, results };
 }
