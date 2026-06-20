@@ -1,0 +1,30 @@
+{
+  "name": "rhvoice-emscripten-lb",
+  "version": "1.0.0",
+  "description": "Proof of concept: the [RHVoice](https://github.com/RHVoice/RHVoice) speech synthesizer compiled to **WebAssembly** with Emscripten, driving the Luxembourgish voices **Mil** (male) and **Mia** (female), reading text from an HTML page and playing it back through the **Web Audio API** — no server.",
+  "homepage": "https://github.com/accessibility-luxembourg/rhvoice-emscripten-lb#readme",
+  "bugs": {
+    "url": "https://github.com/accessibility-luxembourg/rhvoice-emscripten-lb/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/accessibility-luxembourg/rhvoice-emscripten-lb.git"
+  },
+  "license": "MIT",
+  "author": "",
+  "type": "module",
+  "main": "./src/rhvoice-tts.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "node test/node-synth.js && node test/browser-check.js",
+    "build": "./build.sh && ./make-data.sh"
+  },
+  "devDependencies": {
+    "puppeteer": "^25.1.0"
+  },
+  "allowScripts": {
+    "puppeteer@25.1.0": true
+  }
+}

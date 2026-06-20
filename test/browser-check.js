@@ -3,10 +3,10 @@
 //           with both voices via the real JS/Web Audio path.
 //  Pass 2 — reload with the SAME browser profile and confirm the voice data is
 //           served from the IndexedDB cache (no re-download).
-const os = require('os');
-const path = require('path');
-const fs = require('fs');
-const puppeteer = require('/Users/biou/Projects/a11yStatementCrawler/node_modules/puppeteer');
+import os from 'os';
+import path from 'path';
+import fs from 'fs';
+import puppeteer from 'puppeteer';
 
 const URL = process.env.URL || 'http://localhost:8080/index.html';
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'rhv-profile-'));

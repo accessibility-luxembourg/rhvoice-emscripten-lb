@@ -1,9 +1,10 @@
 // Headless verification: synthesize Luxembourgish with Mil and Mia in Node,
 // using the real ./data directory mounted via NODEFS. Writes WAV files so the
 // output can be inspected. Proves the wasm pipeline works end to end.
-const path = require('path');
-const fs = require('fs');
-const { pathToFileURL } = require('url');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
+const __dirname = import.meta.dirname;
 
 function writeWav(file, int16, sampleRate) {
   const dataLen = int16.length * 2;

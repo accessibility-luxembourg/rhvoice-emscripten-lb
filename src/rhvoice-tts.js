@@ -185,7 +185,7 @@ async function prepare(voice, report = () => {}) {
 }
 
 // Boot + load a default voice so the first click is fast.
-export async function init(onProgress, defaultVoice = 'mia') {
+export async function init(onProgress, defaultVoice = 'mil') {
   const report = (m, f) => { log(m); if (onProgress) onProgress(m, f); };
   await prepare(defaultVoice, report);
   report('Ready.');

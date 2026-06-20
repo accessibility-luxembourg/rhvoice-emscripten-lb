@@ -14,4 +14,7 @@ _site/
 # Test output
 test/out-*.wav
 
+# npm
+node_modules/
+
 # Generated config headers are written into vendor/ by build.sh
