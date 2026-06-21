@@ -22,8 +22,13 @@ const translations = {
 }
 
 function embed() {
-    const lang = document.querySelector('html').getAttribute('lang') ?? 'en'
-    function tr (str) { return (translations[lang][str] ?? str) }
+    const lang = document.querySelector('html').getAttribute('lang').split('-')[0] ?? 'en'
+    function tr (str) { 
+        if (translations[lang] === undefined) {
+            lang = 'en'
+        }
+        return (translations[lang][str] ?? str)
+    }
     const tpl = `
     <style>
 #srlb-text-sample {
