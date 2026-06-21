@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="lb">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RHVoice WebAssembly — Lëtzebuergesch (Mil &amp; Mia)</title>
+  <title>Mil and Mia Luxembourgish voices demo</title>
   <style>
     body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
     h1 { font-size: 1.4rem; }
@@ -18,9 +18,10 @@
   </style>
 </head>
 <body>
-  <h1>RHVoice in the browser — Luxembourgish voices Mil &amp; Mia</h1>
-  <p>A proof of concept: the RHVoice synthesizer compiled to WebAssembly, reading
-     Luxembourgish text and playing it back through the Web Audio API — no server.</p>
+  <h1>Demo of Mil and Mia in the browser</h1>
+  <p>Mil and Mia are two luxembourgish voices which can be used in screen readers. Before installing them, you can try them in this page.
+    For more information about Mil and Mia, feel free to read this article: <a href="https://accessibilite.public.lu/en/news/2026-03-30-screenreaderLB.html">Two new voices for reading Luxembourgish</a>.
+  </p>
 
   <div class="controls">
     <label for="voice">Voice:</label>
@@ -35,15 +36,22 @@
     <button id="pause">⏸ Pause</button>
   </div>
 
-  <article id="page-text">
-    <p>Moien! Wëllkomm op dëser Säit. Dëst ass eng Demonstratioun vun der
-       Lëtzebuerger Sprooch mat RHVoice, deen direkt am Browser leeft.</p>
-    <p>D'Stëmmen Mil a Mia kënnen elo Texter virliesen, ouni datt e Server néideg ass.
-       D'Sprooch gëtt mat WebAssembly synthetiséiert an iwwer d'Web&nbsp;Audio&nbsp;API ofgespillt.</p>
+  <article id="page-text" lang="lb">
+    <p>Moien! Wëllkomm op dëser Säit. Dëst ass eng Demonstratioun vun de
+       Lëtzebuerger Stëmmen Mil a Mia, déi direkt am Browser lafen.</p>
+    <p>Eng weiblech Stëmm an eng männlech Stëmm, déi Texter op Lëtzebuergesch virliese kënnen, 
+      sinn elo op Computeren an Handie verfügbar: dëst ass eng Première, déi den SIP (Informatiouns- a Pressedéngscht) Iech ab haut invitéiert, auszeprobéieren.
+    Als Resultat vu bal engem Joer Aarbecht kruten d'Mia an de Mil eng exzellent Ausbildung: fir d'éischt eng Zäit am Zenter fir d'Lëtzebuerger Sprooch, wou si 70.000 lëtzebuergesch Wierder geléiert hunn; 
+    duerno eng rigoréis Ausbildung bei LouderPages, eng Firma, déi sech op Sproochsynthes spezialiséiert huet, an zum Schluss eng Validatioun vun hire Fäegkeeten duerch Tester am Centre pour le développement des compétences relatifs à la vue (CDV). 
+  </p>
+  <p>
+    Mia a Mil sinn op Windows, macOS, Android an iOS verfügbar. Fir all Plattform goufen Guiden a véier Sprooche geschriwwen. 
+    Mir recommandéieren Iech, se ze liesen, ier Dir d'RHVoice App an déi lëtzebuergesch Stëmmen op Ärem Handy, Tablet oder Computer installéiert.
+  </p>
   </article>
 
   <p style="margin-top:1.5rem"><label for="free-text">Or type your own text:</label></p>
-  <textarea id="free-text">Schwätzt mat mir op Lëtzebuergesch!</textarea>
+  <textarea id="free-text" lang="lb">Schwätzt mat mir op Lëtzebuergesch!</textarea>
   <div class="controls">
     <button id="speak">▶︎ Speak the text above</button>
     <button id="download">⬇︎ Download WAV</button>
@@ -55,7 +63,7 @@
   </p>
 
   <progress id="bar" value="0" max="1" hidden></progress>
-  <div id="status">Loading…</div>
+  <div id="status" role="status">Loading…</div>
 
   <!-- The library is an ES module; it imports the Emscripten factory itself. -->
   <script type="module">
