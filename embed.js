@@ -48,7 +48,7 @@ margin: 1rem 0;
     </style>
     <div class="srlb-demo-content">
         <label for="srlb-text-sample">${tr('text')}</label>
-        <textarea id="srlb-text-sample" lang="lb">Schwätzt mat mir op Lëtzebuergesch!</textarea>
+        <textarea id="srlb-text-sample" lang="lb" spellcheck="false">Schwätzt mat mir op Lëtzebuergesch!</textarea>
         <div class="srlb-controls">
             <label for="srlb-voice">${tr('voice')}:</label>
             <select id="srlb-voice">
