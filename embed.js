@@ -60,8 +60,8 @@ margin: 1rem 0;
             <output id="srlb-rate-val">1.0×</output>
         </div>
         <div class="srlb-controls">
-            <button id="srlb-play" data-status="idle">▶︎ ${tr('play')}</button>
-            <button id="srlb-download">💾 ${tr('download')}</button>
+            <button id="srlb-play" data-status="idle"><span aria-hidden="true">▶︎</span> ${tr('play')}</button>
+            <button id="srlb-download"><span aria-hidden="true">💾</span> ${tr('download')}</button>
         </div>
             <progress id="srlb-bar" value="0" max="1" hidden></progress>
     </div>
@@ -109,10 +109,10 @@ margin: 1rem 0;
         } catch (e) {
             setStatus('Error: ' + e.message);
             playBtn.dataset.status = 'idle'
-            playBtn.innerText = '▶︎ ' + tr('play')
+            playBtn.innerHTML = '<span aria-hidden="true">▶︎</span> ' + tr('play')
         } finally {
             playBtn.dataset.status = 'idle'
-            playBtn.innerText = '▶︎ ' + tr('play')
+            playBtn.innerHTML = '<span aria-hidden="true">▶︎</span> ' + tr('play')
         }
         }
 
@@ -146,7 +146,7 @@ margin: 1rem 0;
         playBtn.addEventListener('click', () => {
             if (playBtn.dataset.status === 'idle') {
                 playBtn.dataset.status = 'playing'
-                playBtn.innerText = '⏸ ' + tr('pause')
+                playBtn.innerHTML = '<span aria-hidden="true">⏸</span> ' + tr('pause')
                 console.log('playing')
                 RHVoiceTTS.unlock();
                 say(document.getElementById('srlb-text-sample').value, { ssml: false, rate: rate() });
@@ -155,7 +155,7 @@ margin: 1rem 0;
                 const state = RHVoiceTTS.togglePause(); 
                 console.log(state, playBtn.dataset.status)
                 playBtn.dataset.status = (state === 'paused' ? 'paused' : 'playing')
-                playBtn.textContent = state === 'paused' ? '▶︎ '+tr('resume') : '⏸ '+tr('pause');
+                playBtn.innerHTML = state === 'paused' ? '<span aria-hidden="true">▶︎</span> ' + tr('resume') : '<span aria-hidden="true">⏸</span> ' + tr('pause');
             } 
         });
         dlBtn.addEventListener('click', downloadWav);  // download needs no audio unlock
