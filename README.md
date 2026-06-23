@@ -64,6 +64,18 @@ API:
 `../dist/rhvoice.js` and resolves `../data/` relative to itself
 (`import.meta.url`), so it works from any base path.
 
+## Embed code
+
+You can embed a demo into your website by including the following embed code:
+
+```
+<div id="srlb-demo"></div>      
+<script type="module" src="https://accessibility-luxembourg.github.io/rhvoice-emscripten-lb/embed.js"></script>
+```
+
+The demo form is available in English and French for now, the language is automatically selected based on the `lang` attribute on the `html` element.
+This embed is for example used on this page: [Two new voices for reading Luxembourgish](https://accessibilite.public.lu/en/news/2026-03-30-screenreaderLB.html#give-them-a-listen)
+
 ## Layout
 
 | Path | What |
