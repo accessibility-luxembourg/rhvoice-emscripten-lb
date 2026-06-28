@@ -82,7 +82,7 @@ let workletAdded = false;
 // accumulating up to ~maxChars so each chunk is a sensible unit. A boundary-free
 // run longer than maxChars is split on whitespace as a last resort. Lets long
 // texts start playing after the first phrase instead of after the whole thing.
-export function chunkText(text, maxChars = 250) {
+export function chunkText(text, maxChars = 1000) {
   const parts = String(text).match(/\s*[^.!?;:\n…]+[.!?;:\n…]*/g) || [];
   const out = [];
   let cur = '';
