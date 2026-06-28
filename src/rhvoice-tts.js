@@ -397,6 +397,21 @@ export function togglePause() {
   return audioCtx.state;
 }
 
+// Write a new user dictionary for the given language into the virtual FS and
+// re-initialize the engine so the changes take effect immediately. The modified
+// dict is NOT saved to IndexedDB — a page reload restores the original.
+export async function setDictText(language, content) {
+  if (!Module) throw new Error('synthesizer not booted');
+  const dictRel = `languages/${language}/userdict/src/dict.txt`;
+  const target = `${DATA_ROOT}/${dictRel}`;
+  Module.FS.mkdirTree(target.slice(0, target.lastIndexOf('/')));
+  Module.FS.writeFile(target, new TextEncoder().encode(content));
+  const rc = Module.ccall('rhv_init', 'number', ['string', 'string'], [DATA_ROOT, '']);
+  if (rc !== 0) throw new Error('rhv_init failed: ' + lastError());
+  engineVoices = [...loaded].filter((k) => k.startsWith('voice:')).sort().join(',');
+  log('dict applied, engine voices:', Module.ccall('rhv_voices', 'string', [], []));
+}
+
 export function audioInfo() {
   return {
     audioSession: (navigator.audioSession && navigator.audioSession.type) || 'unsupported',
@@ -410,4 +425,5 @@ export const isReady = () => booted && engineVoices !== '';
 export default {
   init, synthesize, speak, toWav, chunkText,
   unlock, pause, resume, togglePause, audioInfo, isReady,
+  setDictText,
 };
