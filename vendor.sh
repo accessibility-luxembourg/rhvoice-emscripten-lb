@@ -2,6 +2,7 @@
 # Fetch the upstream sources this project builds from, into vendor/:
 #   - RHVoice core (master; includes the Luxembourgish language registration),
 #   - the Mil and Mia voice packs,
+#   - the English slt voice pack,
 #   - the compiled Luxembourgish language data,
 #   - RHVoice's bundled header-only Boost + sonic (git submodules).
 # Idempotent: existing clones are left in place.
@@ -22,6 +23,8 @@ clone https://github.com/RHVoice/RHVoice                       RHVoice
 clone https://github.com/louderpages/RHVoice-Mil               RHVoice-Mil
 clone https://github.com/louderpages/RHVoice-Mia               RHVoice-Mia
 clone https://github.com/louderpages/RHVoice-Luxembourgish-bin RHVoice-Luxembourgish-bin
+clone https://github.com/RHVoice/English English
+clone https://github.com/RHVoice/slt-eng slt-eng
 
 # Bundled dependencies (submodules of the RHVoice repo): header-only Boost + sonic.
 echo "Initializing Boost + sonic submodules…"

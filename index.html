@@ -29,6 +29,8 @@
       <option value="mil">Mil (male)</option>
       <option value="mia">Mia (female)</option>
     </select>
+    <input type="checkbox" id="combine-en" checked>
+    <label for="combine-en">Language switching</label>
     <label for="rate">Rate:</label>
     <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1">
     <output id="rate-val">1.0×</output>
@@ -78,6 +80,7 @@
     const pauseBtn = document.getElementById('pause');
     const resetPause = () => { pauseBtn.textContent = '⏸ Pause'; };
     const voiceSel = document.getElementById('voice');
+    const combineEn = document.getElementById('combine-en');
     const ssmlChk = document.getElementById('ssml');
     const rateEl = document.getElementById('rate');
     const rateVal = document.getElementById('rate-val');
@@ -103,13 +106,20 @@
       }
     }
 
+    function resolveVoice() {
+      const v = voiceSel.value;
+      return combineEn.checked ? v + '+slt' : v;
+    }
+
     async function say(text, opts = {}) {
       speakBtn.disabled = readBtn.disabled = true;
       resetPause();               // new playback starts unpaused
+      const voice = resolveVoice();
+      const label = voiceSel.options[voiceSel.selectedIndex].text + (combineEn.checked ? ' + Slt (EN)' : '');
       try {
         await ensureReady();      // first click downloads data, inits engine
-        setStatus(`Synthesizing with “${voiceSel.value}”…`);
-        const r = await RHVoiceTTS.speak(text, voiceSel.value, opts);
+        setStatus(`Synthesizing with “${label}”…`);
+        const r = await RHVoiceTTS.speak(text, voice, opts);
         const a = RHVoiceTTS.audioInfo();
         setStatus(`Done — ${r.duration.toFixed(1)}s. ` +
           `audio: session=${a.audioSession}, ctx=${a.ctxState}, ${a.sampleRate}Hz`);
@@ -124,16 +134,17 @@
     async function downloadWav() {
       const text = document.getElementById('free-text').value;
       dlBtn.disabled = true;
+      const voice = resolveVoice();
       try {
         await ensureReady();
         setStatus('Synthesizing for download…');
-        const res = await RHVoiceTTS.synthesize(text, voiceSel.value,
+        const res = await RHVoiceTTS.synthesize(text, voice,
           { ssml: ssmlChk.checked, rate: rate() });
         if (!res.samples) { setStatus('Nothing to synthesize.'); return; }
         const url = URL.createObjectURL(RHVoiceTTS.toWav(res));
         const a = document.createElement('a');
         a.href = url;
-        a.download = `rhvoice-${voiceSel.value}.wav`;
+        a.download = `rhvoice-${voice.replace('+slt', '')}.wav`;
         document.body.appendChild(a);
         a.click();
         a.remove();

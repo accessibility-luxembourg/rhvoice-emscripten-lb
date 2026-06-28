@@ -31,6 +31,11 @@ let booted = false;               // module up, FS mounted
 const loaded = new Set();         // resource keys present in the FS ("lang", "voice:mia"…)
 let engineVoices = '';            // which voices the live engine was built with
 
+// Split a combined voice spec into individual voice names (e.g. "mil+slt" -> ["mil", "slt"]).
+function parseVoices(voice) {
+  return voice ? voice.split('+').map(v => v.trim()).filter(Boolean) : [];
+}
+
 const TARGET_RATE = 24000;        // the voices' sample rate; we run the context at it
 
 // AudioWorklet processor: a simple PCM queue. Chunks (Float32, at the context
@@ -148,11 +153,15 @@ async function boot(report) {
   booted = true;
 }
 
-// Ensure the language + the requested voice are in the FS, and (re)build the
+// Ensure the language + the requested voices are in the FS, and (re)build the
 // engine if the available voice set changed. `report(msg, frac?)` is optional.
+// `voice` may be a single name ("mil") or a combined spec ("mil+slt").
 async function prepare(voice, report = () => {}) {
   await boot(report);
-  if (!manifest.voices[voice]) throw new Error(`unknown voice: ${voice}`);
+  const voices = parseVoices(voice);
+  for (const v of voices) {
+    if (!manifest.voices[v]) throw new Error(`unknown voice: ${v}`);
+  }
 
   let added = 0;
   if (!loaded.has('lang')) {
@@ -160,11 +169,13 @@ async function prepare(voice, report = () => {}) {
       (d, t) => report(`Downloading language data… ${d}/${t}`, d / t));
     loaded.add('lang');
   }
-  const vkey = `voice:${voice}`;
-  if (!loaded.has(vkey)) {
-    added += await fetchInto(manifest.voices[voice],
-      (d, t) => report(`Downloading voice “${voice}”… ${d}/${t}`, d / t));
-    loaded.add(vkey);
+  for (const v of voices) {
+    const vkey = `voice:${v}`;
+    if (!loaded.has(vkey)) {
+      added += await fetchInto(manifest.voices[v],
+        (d, t) => report(`Downloading voice “${v}”… ${d}/${t}`, d / t));
+      loaded.add(vkey);
+    }
   }
   if (added > 0) {
     report('Saving to IndexedDB cache…');

@@ -52,8 +52,8 @@ margin: 1rem 0;
         <div class="srlb-controls">
             <label for="srlb-voice">${tr('voice')}:</label>
             <select id="srlb-voice">
-                <option value="mil">Mil</option>
-                <option value="mia">Mia</option>
+                <option value="mil+slt">Mil</option>
+                <option value="mia+slt">Mia</option>
             </select>
             <label for="srlb-rate">${tr('rate')}:</label>
             <input type="range" id="srlb-rate" min="0.5" max="2" step="0.1" value="1">
